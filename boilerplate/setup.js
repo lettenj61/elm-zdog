@@ -1,5 +1,4 @@
-(function(Zdog) {
-
+;(function (Zdog) {
   const ctorMap = {
     1: 'Rect',
     2: 'RoundedRect',
@@ -9,7 +8,13 @@
     6: 'Hemisphere',
     7: 'Cone',
     8: 'Cylinder',
-    9: 'Box'
+    9: 'Box',
+  }
+
+  // should be synced with `type Msg` in boilerplate/Zdog/Update.elm
+  const msgMap = {
+    0: 'set-root',
+    1: 'update-graph',
   }
 
   function createShape(a, params) {
@@ -20,49 +25,104 @@
 
     return new Zdog[Ctor]({
       addTo: a,
-      ...params
+      ...params,
     })
   }
 
-  function install(app) {
-    let illo, wrapper
-    ;
+  class ElmZdogElement extends HTMLElement {
+    static get observedAttributes() {
+      return ['operation', 'type']
+    }
 
-    function onMount([config, model]) {
-      if (!illo) {
-        const uid = 'elm-zdog-' + Math.random().toString().replace(/\W/g, '-')
+    constructor() {
+      super()
 
-        wrapper = document.createElement('canvas')
-        wrapper.setAttribute('id', uid)
-        wrapper.setAttribute('width', config.width)
-        wrapper.setAttribute('height', config.height)
-        document.body.appendChild(wrapper)
-        ;
+      const shadow = this.attachShadow({ mode: 'open' })
+      const canvas = document.createElement('canvas')
 
-        illo = new Zdog.Illustration({
-          element: wrapper,
-          dragRotate: !!config.dragRotate
-        })
+      /**
+       * Consider this as normal HTML canvas, we can manipulate anything from
+       * normal virtual DOM operation from inside Elm, e.g. set attributes and events.
+       *
+       * TODO: support SVG
+       */
+      shadow.appendChild(canvas)
 
-        for (const params of model) {
-          createShape(illo, params)
-        }
+      // TODO: keep track on graph updates
+      this.anchorMap = new Map()
+      this.lastAnchorId = 0
+      this.root = null
+      this.canvas = canvas
 
-        if (config.useAnimation || config.dragRotate) {
-          function animate() {
-            illo.updateRenderGraph()
-            requestAnimationFrame(animate)
-          }
-          animate()
-        } else {
-          illo.updateRenderGraph()
+      // My plan is to share `this.model` and `this.config` between Elm and custom elements.
+      // Although update is always done by Elm, this might be too complicated.
+    }
+
+    connectedCallback() {
+      const canvas = this.canvas
+      canvas.setAttribute('width', this.getAttribute('width'))
+      canvas.setAttribute('height', this.getAttribute('height'))
+    }
+
+    attributeChangedCallback(name, oldValue, newValue) {
+      if (oldValue !== newValue) {
+        switch (name) {
+          case 'operation':
+            const msg = msgMap[newValue]
+            if (msg === 'set-root') {
+              this.setRoot()
+            }
+            break
+          default:
+            break
         }
       }
     }
 
-    app.ports.requireIllo.subscribe(onMount)
+    setRoot() {
+      if (!this.config || !this.model) {
+        // Something goes wrong in Elm
+        return
+      }
+      // TODO: support Anchor as well as Illustration
+      const { model, canvas, config } = this
+      const illo = new Zdog.Illustration({
+        element: canvas,
+        dragRotate: !!(config && config.dragRotate),
+      })
+
+      for (const params of model) {
+        createShape(illo, params)
+      }
+
+      if (config && (config.useAnimation || config.dragRotate)) {
+        function animate() {
+          illo.updateRenderGraph()
+          requestAnimationFrame(animate)
+        }
+        animate()
+      } else {
+        illo.updateRenderGraph()
+      }
+
+      this.root = illo
+      this.trackAnchor(this.lastAnchorId++, this.root)
+    }
+
+    updateGraph() {
+      // make sure we have params updated
+      // TODO: patching?
+      if (!this.root || !this.model) return
+    }
+
+    trackAnchor(id, anchor) {
+      const oldAnchor = this.anchorMap.get(id)
+      if (oldAnchor != null) {
+        // do some cleanup
+      }
+      this.anchorMap.set(id, anchor)
+    }
   }
 
-  // Hello, Zdog!
-  Zdog.installToElm = install
+  customElements.define('elm-zdog-element', ElmZdogElement)
 })(window.Zdog)

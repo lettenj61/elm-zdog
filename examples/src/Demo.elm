@@ -1,7 +1,8 @@
 module Demo exposing (..)
 
 import Browser
-import Html
+import Html exposing (Html)
+import Html.Attributes as Attributes
 import Zdog exposing (defaultZdog)
 import Zdog.Shape as Shape
 import Zdog.Properties exposing (..)
@@ -11,7 +12,7 @@ main : Program () () ()
 main =
     Browser.element
         { init = init
-        , view = always (Html.text "")
+        , view = view
         , update = \_ model -> ( model, Cmd.none )
         , subscriptions = always Sub.none
         }
@@ -20,14 +21,19 @@ main =
 init : () -> ( (), Cmd msg )
 init _ =
     ( ()
-    , Zdog.illo
-        { defaultZdog
-            | model = dome -- how to draw a tangram?
-            , width = Just 240
-            , height = Just 240
-            , dragRotate = True
-        }
+    , Cmd.none
     )
+
+
+view : () -> Html msg
+view _ =
+    Zdog.canvas
+        { defaultZdog | dragRotate = True
+        }
+        [ Attributes.width 240
+        , Attributes.height 240
+        ]
+        dome
 
 
 dome : List Shape.Model

@@ -1,20 +1,17 @@
-port module Zdog exposing
-    ( defaultZdog, illo )
+module Zdog exposing
+    ( canvas, defaultZdog )
 
+import Html exposing (Attribute, Html)
+import Html.Attributes as Attributes
 import Json.Decode exposing (Value)
 import Json.Encode as Encode
 import Zdog.Shape as Shape exposing (Shape(..))
-
-
-port requireIllo : Value -> Cmd msg
+import Zdog.Update as Update
 
 
 type alias Config =
     { dragRotate : Bool
     , useAnimation : Bool
-    , width : Maybe Int
-    , height : Maybe Int
-    , model : List Shape.Model
     }
 
 
@@ -22,27 +19,26 @@ defaultZdog : Config
 defaultZdog =
     { dragRotate = False
     , useAnimation = False
-    , width = Nothing
-    , height = Nothing
-    , model = []
     }
 
 
-illo : Config -> Cmd msg
-illo { dragRotate, useAnimation, width, height, model } =
-    requireIllo <|
-        Encode.list
-            identity
-            [ Encode.object
-                [ ( "dragRotate", Encode.bool dragRotate )
-                , ( "useAnimation", Encode.bool useAnimation )
-                , ( "width", width |> Maybe.map Encode.int |> Maybe.withDefault (Encode.int 480) )
-                , ( "height", height |> Maybe.map Encode.int |> Maybe.withDefault (Encode.int 480) )
-                ]
-            , Encode.list Shape.encode model
+canvas : Config -> List (Attribute msg) -> List (Shape.Model) -> Html msg
+canvas config attrs model =
+    let
+        myAttrs =
+            [ Attributes.property "config" <| encodeConfig config
+            , Attributes.property "model" <| Encode.list Shape.encode model
+            , Attributes.attribute "operation" <| Update.toString Update.SetRoot
             ]
+    in
+    Html.node "elm-zdog-element"
+        (myAttrs ++ attrs)
+        []
 
 
-type MyMsg
-    = NewIllustration
-    | NewAnimation
+encodeConfig : Config -> Value
+encodeConfig { dragRotate, useAnimation } =
+    Encode.object
+        [ ( "dragRotate", Encode.bool dragRotate )
+        , ( "useAnimation", Encode.bool useAnimation )
+        ]
